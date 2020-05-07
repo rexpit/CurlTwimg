@@ -349,11 +349,6 @@ function InputBox([string]$prompt, [string]$title = "", [string]$default = "")
     return $result
 }
 
-function changeDirectoryDotNet
-{
-
-}
-
 # 処理実行
 try
 {
