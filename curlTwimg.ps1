@@ -349,9 +349,19 @@ function InputBox([string]$prompt, [string]$title = "", [string]$default = "")
     return $result
 }
 
+function changeDirectoryDotNet
+{
+
+}
+
 # 処理実行
 try
 {
+    # 前処理
+    # .NET Framework のカレントディレクトリを PowerShell のカレントディレクトリに移動
+    $cdPs1 = [System.Environment]::CurrentDirectory # 前回値保持
+    [System.Environment]::CurrentDirectory = Convert-Path . # 移動処理
+
     # 引数指定がなければダイアログ表示
     if ( [string]::IsNullOrEmpty($URL) )
     {
@@ -374,4 +384,10 @@ catch
     {
         $dialogResult = [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "Error", "OK", "Error")
     }
+}
+finally
+{
+    # 後処理
+    # .NET Framework のカレントディレクトリを元に戻す
+    [System.Environment]::CurrentDirectory = $cdPs1
 }
