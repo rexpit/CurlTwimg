@@ -13,13 +13,16 @@ Param
 (
     [string]$URL,
     [string]$OutFile,
-    [string]$Referer
+    [string]$Referer,
+    [string]$UserAgent
 )
 
 # 定数
-$HostName_twimg = "pbs.twimg.com"
-$HostName_pximg = "i.pximg.net"
-$Referer_pixiv = "https://www.pixiv.net"
+$script:HostName_twimg = "pbs.twimg.com"
+$script:Referer_twitter = "https://twitter.com"
+$script:HostName_pximg = "i.pximg.net"
+$script:Referer_pixiv = "https://www.pixiv.net"
+$script:DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:76.0) Gecko/20100101 Firefox/76.0"
 
 # .NETアセンブリをロード
 Add-Type -AssemblyName System.Windows.Forms
@@ -47,6 +50,8 @@ function MainInteractive
         {
             Write-Host "Referer  : $referer"
         }
+        # UserAgent 設定
+        $userAgent = $script:DefaultUserAgent
 
         # SaveFileDialog を定義
         $sfd = [System.Windows.Forms.SaveFileDialog]::new()
@@ -59,7 +64,7 @@ function MainInteractive
             # 1行空ける
             Write-Host
             # ダウンロード実行
-            DownloadFileAndSave_Invoke_WebRequest $outputUrl $sfd.FileName $referer
+            DownloadFileAndSave_Invoke_WebRequest $outputUrl $sfd.FileName $referer $userAgent
         }
         else
         {
@@ -77,7 +82,8 @@ function MainInteractive
 # - $paramUrl: 入力 URL
 # - $paramFileName: 入力 ファイル名
 # - $paramReferer: 入力 Referer
-function MainAuto([string]$paramUrl, [string]$paramFileName=[string]::Empty, [string]$paramReferer=[string]::Empty)
+# - $paramUserAgent: 入力 UserAgent
+function MainAuto([string]$paramUrl, [string]$paramFileName="", [string]$paramReferer="", [string]$paramUserAgent="")
 {
     $inputUrl = $paramUrl
     if ( -not [string]::IsNullOrEmpty($inputUrl) )
@@ -113,6 +119,16 @@ function MainAuto([string]$paramUrl, [string]$paramFileName=[string]::Empty, [st
         {
             Write-Host "Referer  : $referer"
         }
+        # UserAgent の指定があればそれを設定
+        if (-not [string]::IsNullOrEmpty($paramUserAgent))
+        {
+            $userAgent = $paramUserAgent
+        }
+        # なければデフォルトを使用
+        else
+        {
+            $userAgent = $script:DefaultUserAgent
+        }
 
         # 指定のファイル名が存在すれば中止
         if (Test-Path $saveFileName)
@@ -125,7 +141,7 @@ function MainAuto([string]$paramUrl, [string]$paramFileName=[string]::Empty, [st
             # 1行空ける
             Write-Host
             # ダウンロード実行
-            DownloadFileAndSave_Invoke_WebRequest $outputUrl $saveFileName $referer
+            DownloadFileAndSave_Invoke_WebRequest $outputUrl $saveFileName $referer $userAgent
         }
     }
 }
@@ -150,6 +166,8 @@ function Get_OrigUrl_OutFileName([string]$url)
     if ( $uri.Host -eq $Script:HostName_twimg )
     {
         Write-Host "Twitter 画像モード"
+        # リファラーを設定
+        $referer = $script:Referer_twitter
         # "?format=拡張子&name=…" があったら "?format=拡張子&name=orig" にする。
         if (-not [string]::IsNullOrEmpty($uri.Query))
         {
@@ -192,7 +210,8 @@ function Get_OrigUrl_OutFileName([string]$url)
 # - $url: ダウンロードする URL
 # - $saveFileName: 保存ファイル名
 # - $referer: リファラー
-function DownloadFileAndSave_WebClient([string]$url, [string]$saveFileName, [string]$referer=[string]::Empty)
+# - $userAgent: User Agent
+function DownloadFileAndSave_WebClient([string]$url, [string]$saveFileName, [string]$referer="", [string]$userAgent="")
 {
     Write-Host "Download $url"
     $client = [System.Net.WebClient]::new()
@@ -202,6 +221,12 @@ function DownloadFileAndSave_WebClient([string]$url, [string]$saveFileName, [str
     {
         $client.Headers.Add("Referer", $referer)
     }
+    # User Agent がある場合はヘッダーに追加する
+    if (-not [string]::IsNullOrEmpty($userAgent) )
+    {
+        $client.Headers.Add("User-Agent", $userAgent)
+    }
+    # ダウンロード実行
     $client.DownloadFile($uri, $saveFileName)
     Write-Host "ダウンロードが完了しました。"
     Write-Host ("FileName: {0}" -f $saveFileName)
@@ -219,14 +244,22 @@ function DownloadFileAndSave_WebClient([string]$url, [string]$saveFileName, [str
 # - $url: ダウンロードする URL
 # - $saveFileName: 保存ファイル名
 # - $referer: リファラー
-function DownloadFileAndSave_Invoke_WebRequest([string]$url, [string]$saveFileName, [string]$referer=[string]::Empty)
+# - $userAgent: User Agent
+function DownloadFileAndSave_Invoke_WebRequest([string]$url, [string]$saveFileName, [string]$referer="", [string]$userAgent="")
 {
     Write-Host "Download $url"
     $headers = @{}
+    # Referer がある場合はヘッダーに追加する
     if (-not [string]::IsNullOrEmpty($referer) )
     {
         $headers["Referer"] = $referer
     }
+    # User Agent がある場合はヘッダーに追加する
+    if (-not [string]::IsNullOrEmpty($userAgent) )
+    {
+        $headers["User-Agent"] = $userAgent
+    }
+    # ダウンロード実行
     $webRequest = Invoke-WebRequest $url -Headers $headers
     Write-Host "ダウンロードが完了しました。"
     # バイナリ保存
@@ -330,7 +363,7 @@ function InputBox([string]$prompt, [string]$title = "", [string]$default = "")
     $form.Controls.Add($CancelButton)
 
     # フォームを常に手前に表示
-    $form.Topmost = $true
+    $form.TopMost = $true
     # フォームをアクティブにし、テキストボックスにフォーカスを設定
     $form.Add_Shown({$textBox.Select()})
 
@@ -367,7 +400,7 @@ try
     else
     {
         # 第1引数を URL とする。
-        MainAuto $URL $OutFile $Referer
+        MainAuto $URL $OutFile $Referer $UserAgent
     }
 }
 catch
@@ -377,7 +410,11 @@ catch
     # 引数指定がなければダイアログも表示する。
     if ( $args.Count -le 0 )
     {
-        $dialogResult = [System.Windows.Forms.MessageBox]::Show($_.Exception.Message, "Error", "OK", "Error")
+        # ダイアログを最前面に表示するためのダミーフォーム
+        $f = [Windows.Forms.Form]::new()
+        $f.TopMost = $true
+        # ダイアログ表示
+        $dialogResult = [System.Windows.Forms.MessageBox]::Show($f, $_.Exception.Message, "Error", "OK", "Error")
     }
 }
 finally
