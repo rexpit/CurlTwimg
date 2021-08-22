@@ -22,7 +22,7 @@ $script:HostName_twimg = "pbs.twimg.com"
 $script:Referer_twitter = "https://twitter.com"
 $script:HostName_pximg = "i.pximg.net"
 $script:Referer_pixiv = "https://www.pixiv.net"
-$script:DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:76.0) Gecko/20100101 Firefox/76.0"
+$script:DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36 Edg/92.0.902.78"
 
 # .NETアセンブリをロード
 Add-Type -AssemblyName System.Windows.Forms
@@ -52,6 +52,13 @@ function MainInteractive
         }
         # UserAgent 設定
         $userAgent = $script:DefaultUserAgent
+
+        # ファイルダイアログを開く前に、attachment filename がないか確認
+        $attachment_filename = Get_Content_Disposition_attachment_filename $outputUrl $referer $userAgent
+        if (-not [string]::IsNullOrEmpty($attachment_filename))
+        {
+            $origFileName = $attachment_filename
+        }
 
         # SaveFileDialog を定義
         $sfd = [System.Windows.Forms.SaveFileDialog]::new()
@@ -98,17 +105,6 @@ function MainAuto([string]$paramUrl, [string]$paramFileName="", [string]$paramRe
         {
             Write-Host "orig URL : $outputUrl"
         }
-        # ファイル名の引数指定がある場合はそちらを使用
-        if ( -not [string]::IsNullOrEmpty($paramFileName) )
-        {
-            $saveFileName = $paramFileName
-        }
-        # 引数指定がない場合は URL からファイル名を指定
-        else
-        {
-            Write-Host "FileName : $origFileName"
-            $saveFileName = $origFileName
-        }
         # Referer の指定があればそれを使用
         if (-not [string]::IsNullOrEmpty($paramReferer))
         {
@@ -128,6 +124,23 @@ function MainAuto([string]$paramUrl, [string]$paramFileName="", [string]$paramRe
         else
         {
             $userAgent = $script:DefaultUserAgent
+        }
+        # ファイル名の引数指定がある場合はそちらを使用
+        if ( -not [string]::IsNullOrEmpty($paramFileName) )
+        {
+            $saveFileName = $paramFileName
+        }
+        # 引数指定がない場合は URL からファイル名を指定
+        else
+        {
+            # attachment filename がないか確認
+            $attachment_filename = Get_Content_Disposition_attachment_filename $outputUrl $referer $userAgent
+            if (-not [string]::IsNullOrEmpty($attachment_filename))
+            {
+                $origFileName = $attachment_filename
+            }
+            Write-Host "FileName : $origFileName"
+            $saveFileName = $origFileName
         }
 
         # 指定のファイル名が存在すれば中止
@@ -203,6 +216,55 @@ function Get_OrigUrl_OutFileName([string]$url)
         $referer = $Script:Referer_pixiv
     }
     return $newUrl, $fileName, $referer
+}
+
+# URL のダウンロードを試みた時に HTTP 応答ヘッダに「Content-Disposition: attachment; filename="〜"」がないか確認。
+# 引数
+# - $url: ダウンロードする URL
+# - $referer: リファラー
+# - $userAgent: User Agent
+# 戻り値
+# - 上記がある場合は filename、ない場合は $null
+function Get_Content_Disposition_attachment_filename([string]$url, [string]$referer, [string]$userAgent)
+{
+    $outFilename = $null
+    $headers = @{}
+    # Referer がある場合はヘッダーに追加する
+    if (-not [string]::IsNullOrEmpty($referer) )
+    {
+        $headers["Referer"] = $referer
+    }
+    # User Agent がある場合はヘッダーに追加する
+    if (-not [string]::IsNullOrEmpty($userAgent) )
+    {
+        $headers["User-Agent"] = $userAgent
+    }
+    # ダウンロード実行し HTTP 応答ヘッダーだけ取得
+    $webRequest = Invoke-WebRequest $url -Headers $headers -Method Head
+    # Content-Disposition があれば解析する。
+    if ( $webRequest.Headers.Keys -contains 'Content-Disposition' )
+    {
+        # PowerShell バージョンによってデータ型が異なるので確認
+        $contentDispositionValue = $webRequest.Headers['Content-Disposition']
+        if ( $contentDispositionValue.GetType() -eq [string] )
+        {
+            $contentDispositionStr = $contentDispositionValue
+        }
+        elseif ( $contentDispositionValue.GetType().BaseType -eq [array] )
+        {
+            $contentDispositionStr = $contentDispositionValue[0]
+        }
+        else
+        {
+            throw 'WebRequest.Headers["Content-Disposition"] のデータ型が想定外です。'
+        }
+        # 正規表現でマッチ
+        if ($contentDispositionStr -match 'attachment;\s*filename="?([^"]+)"?')
+        {
+            $outFilename = $Matches[1]
+        }
+    }
+    return $outFilename
 }
 
 # URL のファイルをダウンロードして保存します。
