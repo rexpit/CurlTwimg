@@ -27,6 +27,7 @@ $script:DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKi
 # .NETアセンブリをロード
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Web
 
 # 引数指定がなければ対話型実行
 function MainInteractive
@@ -64,7 +65,7 @@ function MainInteractive
         $sfd = [System.Windows.Forms.SaveFileDialog]::new()
         $sfd.Title = "名前を付けて保存"
         $sfd.Filter = "すべてのファイル|*.*|画像ファイル|*.png;*.jpg;*.gif|JPEG|*.jpg|PNG|*.png|GIF|*.gif"
-        $sfd.FileName = $origFileName
+        $sfd.FileName = [System.Web.HttpUtility]::UrlDecode($origFileName)
         # ファイル選択ダイアログを表示
         if ($sfd.ShowDialog() -eq "OK")
         {
@@ -140,7 +141,7 @@ function MainAuto([string]$paramUrl, [string]$paramFileName="", [string]$paramRe
                 $origFileName = $attachment_filename
             }
             Write-Host "FileName : $origFileName"
-            $saveFileName = $origFileName
+            $saveFileName = [System.Web.HttpUtility]::UrlDecode($origFileName)
         }
 
         # 指定のファイル名が存在すれば中止
