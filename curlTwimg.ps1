@@ -275,7 +275,7 @@ function Get_Content_Disposition_attachment_filename {
     }
 
     # ダウンロード実行し HTTP 応答ヘッダーだけ取得
-    $webResponse = Invoke-WebRequest $url -Headers $headers -Method Head
+    $webResponse = Invoke-WebRequest $url -Headers $headers -Method Head -UseBasicParsing
 
     # レスポンスのヘッダーから Content-Disposition フィールドを取得
     $contentDispositionStr = Get_WebResponse_Header_Value_String $webResponse 'Content-Disposition'
@@ -362,7 +362,7 @@ function DownloadFileAndSave_Invoke_WebRequest {
     }
 
     # ダウンロード実行
-    $webResponse = Invoke-WebRequest $url -Headers $headers
+    $webResponse = Invoke-WebRequest $url -Headers $headers -UseBasicParsing
 
     Write-Host 'ダウンロードが完了しました。'
 
